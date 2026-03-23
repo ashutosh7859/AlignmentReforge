@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <OutputType>Library</OutputType>
+    <Civil3DInstallRoot Condition="'$(Civil3DInstallRoot)' == '' and Exists('C:\\Program Files\\Autodesk\\AutoCAD 2026\\acdbmgd.dll')">C:\Program Files\Autodesk\AutoCAD 2026</Civil3DInstallRoot>
+    <Civil3DAecRoot Condition="'$(Civil3DAecRoot)' == '' and '$(Civil3DInstallRoot)' != ''">$(Civil3DInstallRoot)\ACA</Civil3DAecRoot>
+    <Civil3DC3DRoot Condition="'$(Civil3DC3DRoot)' == '' and '$(Civil3DInstallRoot)' != ''">$(Civil3DInstallRoot)\C3D</Civil3DC3DRoot>
+    <HasCivil3DReferences Condition="Exists('$(Civil3DInstallRoot)\\AcDbMgd.dll') and Exists('$(Civil3DAecRoot)\\AecBaseMgd.dll') and Exists('$(Civil3DC3DRoot)\\AeccDbMgd.dll')">true</HasCivil3DReferences>
+    <DefineConstants Condition="'$(HasCivil3DReferences)' == 'true'">$(DefineConstants);CIVIL3D</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AlignmentReforge.Domain\AlignmentReforge.Domain.csproj" />
+    <ProjectReference Include="..\AlignmentReforge.Geometry\AlignmentReforge.Geometry.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(HasCivil3DReferences)' == 'true'">
+    <Reference Include="AcDbMgd">
+      <HintPath>$(Civil3DInstallRoot)\AcDbMgd.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="AcMgd">
+      <HintPath>$(Civil3DInstallRoot)\AcMgd.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="AcCoreMgd">
+      <HintPath>$(Civil3DInstallRoot)\AcCoreMgd.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="AecBaseMgd">
+      <HintPath>$(Civil3DAecRoot)\AecBaseMgd.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="AeccDbMgd">
+      <HintPath>$(Civil3DC3DRoot)\AeccDbMgd.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+</Project>
