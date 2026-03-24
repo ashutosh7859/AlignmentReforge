@@ -194,8 +194,45 @@ static class Verifier
             errors.Add($"Curve count mismatch. Expected {baseline.Curves.Count}, actual {sampled.Curves.Count}.");
         }
 
-        foreach (var pair in baseline.Curves.Zip(sampled.Curves, (expected, actual) => (expected, actual)))
+        // Build arc-length-based station chain for the baseline curves.
+        // Case 1 chord stations (StaCS, StaST) are systematically shorter than arc-length
+        // because the SC→CS gap vertex stores a single chord, not the arc.
+        // The Case 2 solver works in the sampled-vertex coordinate system, which uses
+        // chord distances between dense sample points — equivalent to arc-length for
+        // small intervals.  Compute arc-length-expected stations using the same chain
+        // formula used by AlignmentSampler so the comparison is apples-to-apples.
+        var arcTsExpected = new double[baseline.Curves.Count];
+        var arcScExpected = new double[baseline.Curves.Count];
+        var arcCsExpected = new double[baseline.Curves.Count];
+        var arcStExpected = new double[baseline.Curves.Count];
+
+        static double Dist(AlignmentReforge.Domain.Point2D a, AlignmentReforge.Domain.Point2D b)
+            => Math.Sqrt((b.X - a.X) * (b.X - a.X) + (b.Y - a.Y) * (b.Y - a.Y));
+
+        var ordered = baseline.Curves.OrderBy(c => c.StaTS).ToArray();
+        if (ordered.Length > 0)
         {
+            arcTsExpected[0] = ordered[0].StaTS;           // leading tangent: chord = arc
+            arcScExpected[0] = ordered[0].StaSC;           // spiral-in chain: chord ≈ arc
+            arcCsExpected[0] = arcScExpected[0] + ordered[0].ArcLength;
+            arcStExpected[0] = arcCsExpected[0] + ordered[0].SpiralLengthOut;
+
+            for (var j = 1; j < ordered.Length; j++)
+            {
+                // Inter-curve tangent is straight: arc-length = Euclidean distance.
+                arcTsExpected[j] = arcStExpected[j - 1]
+                    + Dist(ordered[j - 1].ST.Position, ordered[j].TS.Position);
+                arcScExpected[j] = arcTsExpected[j] + ordered[j].SpiralLengthIn;
+                arcCsExpected[j] = arcScExpected[j] + ordered[j].ArcLength;
+                arcStExpected[j] = arcCsExpected[j] + ordered[j].SpiralLengthOut;
+            }
+        }
+
+        foreach (var (pair, idx) in baseline.Curves
+            .Zip(sampled.Curves, (expected, actual) => (expected, actual))
+            .Select((p, i) => (p, i)))
+        {
+            var staTol = Math.Max(5.0, interval * 0.50);
             Compare(errors, $"C{pair.expected.CurveNumber}.radius", pair.expected.Radius, pair.actual.Radius, Math.Max(2.0, pair.expected.Radius * 0.03));
             Compare(errors, $"C{pair.expected.CurveNumber}.spiralIn", pair.expected.SpiralLengthIn, pair.actual.SpiralLengthIn, Math.Max(5.0, interval * 0.40));
             Compare(errors, $"C{pair.expected.CurveNumber}.spiralOut", pair.expected.SpiralLengthOut, pair.actual.SpiralLengthOut, Math.Max(5.0, interval * 0.40));
@@ -203,10 +240,11 @@ static class Verifier
             Compare(errors, $"C{pair.expected.CurveNumber}.aOut", pair.expected.AOut, pair.actual.AOut, Math.Max(5.0, interval * 0.50));
             Compare(errors, $"C{pair.expected.CurveNumber}.delta", pair.expected.DeltaDegrees, pair.actual.DeltaDegrees, 0.5);
             Compare(errors, $"C{pair.expected.CurveNumber}.arcLength", pair.expected.ArcLength, pair.actual.ArcLength, Math.Max(5.0, interval * 0.40));
-            Compare(errors, $"C{pair.expected.CurveNumber}.staTS", pair.expected.StaTS, pair.actual.StaTS, Math.Max(5.0, interval * 0.50));
-            Compare(errors, $"C{pair.expected.CurveNumber}.staSC", pair.expected.StaSC, pair.actual.StaSC, Math.Max(5.0, interval * 0.50));
-            Compare(errors, $"C{pair.expected.CurveNumber}.staCS", pair.expected.StaCS, pair.actual.StaCS, Math.Max(5.0, interval * 0.50));
-            Compare(errors, $"C{pair.expected.CurveNumber}.staST", pair.expected.StaST, pair.actual.StaST, Math.Max(5.0, interval * 0.50));
+            // Compare arc-length-based stations (not chord-based Case 1 stations)
+            Compare(errors, $"C{pair.expected.CurveNumber}.staTS", arcTsExpected[idx], pair.actual.StaTS, staTol);
+            Compare(errors, $"C{pair.expected.CurveNumber}.staSC", arcScExpected[idx], pair.actual.StaSC, staTol);
+            Compare(errors, $"C{pair.expected.CurveNumber}.staCS", arcCsExpected[idx], pair.actual.StaCS, staTol);
+            Compare(errors, $"C{pair.expected.CurveNumber}.staST", arcStExpected[idx], pair.actual.StaST, staTol);
         }
 
         return errors.Count == 0

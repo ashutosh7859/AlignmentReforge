@@ -76,38 +76,66 @@ public static class AlignmentSampler
 
         var start = solved.InputVertices[0].Position;
         var end = solved.InputVertices[^1].Position;
-        var first = curves[0];
-        if (station <= first.StaTS)
+
+        // Build arc-length-based stations for each curve boundary.
+        //
+        // Case 1 chord-stations: StaTS and StaSC are accurate (spiral chain ≈ arc-length,
+        // straight tangent before TS has chord = arc).  But StaCS = StaSC + chord(SC→CS),
+        // and the arc chord is shorter than the arc-length by up to several metres for
+        // long arcs.  All downstream stations (StaST and the next curve's StaTS) inherit
+        // this error.  Recompute every boundary from the physical geometry instead.
+        var tsArc = new double[curves.Count];
+        var scArc = new double[curves.Count];
+        var csArc = new double[curves.Count];
+        var stArc = new double[curves.Count];
+
+        // First curve: the leading tangent is straight, so chord = arc.
+        tsArc[0] = curves[0].StaTS;
+        scArc[0] = curves[0].StaSC;   // chain of spiral vertices ≈ arc-length
+        csArc[0] = scArc[0] + curves[0].ArcLength;
+        stArc[0] = csArc[0] + curves[0].SpiralLengthOut;
+
+        for (var j = 1; j < curves.Count; j++)
         {
-            return PointAlongLine(start, first.TS.Position, station);
+            // Inter-curve tangent: straight line, so arc-length = Euclidean distance.
+            tsArc[j] = stArc[j - 1] + Distance(curves[j - 1].ST.Position, curves[j].TS.Position);
+            scArc[j] = tsArc[j] + curves[j].SpiralLengthIn;
+            csArc[j] = scArc[j] + curves[j].ArcLength;
+            stArc[j] = csArc[j] + curves[j].SpiralLengthOut;
+        }
+
+        if (station <= tsArc[0])
+        {
+            return PointAlongLine(start, curves[0].TS.Position, station);
         }
 
         for (var i = 0; i < curves.Count; i++)
         {
             var curve = curves[i];
-            if (station <= curve.StaSC)
+
+            if (station <= scArc[i])
             {
-                return IntegrateEntrySpiral(curve, station - curve.StaTS);
+                return IntegrateEntrySpiral(curve, station - tsArc[i]);
             }
 
-            if (station <= curve.StaCS)
+            if (station <= csArc[i])
             {
-                return IntegrateArc(curve, station - curve.StaSC);
+                return IntegrateArc(curve, station - scArc[i]);
             }
 
-            if (station <= curve.StaST)
+            if (station <= stArc[i])
             {
-                return IntegrateExitSpiral(curve, station - curve.StaCS);
+                return IntegrateExitSpiral(curve, station - csArc[i]);
             }
 
             var next = i + 1 < curves.Count ? curves[i + 1] : null;
-            if (next is not null && station <= next.StaTS)
+            if (next is not null && station <= tsArc[i + 1])
             {
-                return PointAlongLine(curve.ST.Position, next.TS.Position, station - curve.StaST);
+                return PointAlongLine(curve.ST.Position, next.TS.Position, station - stArc[i]);
             }
         }
 
-        return PointAlongLine(curves[^1].ST.Position, end, station - curves[^1].StaST);
+        return PointAlongLine(curves[^1].ST.Position, end, station - stArc[curves.Count - 1]);
     }
 
     private static Point2D PointAlongLine(Point2D start, Point2D end, double distanceFromStart)

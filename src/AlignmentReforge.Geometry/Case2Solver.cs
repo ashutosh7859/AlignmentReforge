@@ -195,28 +195,30 @@ internal static class Case2Solver
 
         // ── Step 2: locate the four boundaries by ramp interpolation ──────
 
-        // Rising ramp: indices from g.StartIndex to g.PlateauStart
+        // Rising ramp: indices from g.StartIndex to g.PlateauStart - 1.
         // We fit a line through the ramp κ values vs station, then solve for
         // the stations where the line = 0 (TS) and where it = plateauK (SC).
+        // Exclude the plateau-start point itself: it is already at plateau level
+        // and would corrupt the ramp slope estimate if included.
 
         var tsStation = InterpolateRampZero(
             kappa, stations, g.StartIndex, g.PlateauStart, g.Sign,
-            fromStart: true);
+            g.PlateauKappa, fromStart: true);
 
         var scStation = InterpolateRampLevel(
             kappa, stations, g.StartIndex, g.PlateauStart, g.Sign,
             g.PlateauKappa, fromStart: true);
 
-        // Trailing ramp: from g.PlateauEnd to g.EndIndex
+        // Trailing ramp: from g.PlateauEnd to g.EndIndex.
+
         var csStation = InterpolateRampLevel(
             kappa, stations, g.PlateauEnd, g.EndIndex, g.Sign,
-            g.PlateauKappa, fromStart: true);
+            g.PlateauKappa, fromStart: false);
 
         var stStation = InterpolateRampZero(
             kappa, stations, g.PlateauEnd, g.EndIndex, g.Sign,
-            fromStart: false);
+            g.PlateauKappa, fromStart: false);
 
-        // Validate station ordering
         if (!(tsStation < scStation && scStation < csStation && csStation < stStation))
             throw new InvalidOperationException(
                 $"Boundary interpolation produced invalid station order: " +
@@ -279,7 +281,6 @@ internal static class Case2Solver
         var rmsM = allResid.Length == 0
             ? 0.0
             : Math.Sqrt(allResid.Average(r => r.Residual * r.Residual));
-
         if (rmsM * 1000.0 > s.TrapezoidResidualErrorMm)
             throw new InvalidOperationException(
                 $"Membership test RMS = {rmsM * 1000.0:F1} mm exceeds threshold " +
@@ -340,20 +341,38 @@ internal static class Case2Solver
     /// Fit a line through the ramp κ values and extrapolate to κ = 0.
     /// fromStart=true: extrapolate backward (find TS).
     /// fromStart=false: extrapolate forward (find ST).
+    /// plateauKappa: plateau curvature (1/R); points at or above 95% of plateau
+    /// are excluded — they are arc or arc-transition points, not ramp points.
     /// Falls back to endpoint station if fit is degenerate.
     /// </summary>
     private static double InterpolateRampZero(
         double[] kappa, double[] stations,
-        int from, int to, int sign, bool fromStart)
+        int from, int to, int sign, double plateauKappa, bool fromStart)
     {
+        // Transition-bias: the 3-point OsculatingCurvature at the first/last ramp
+        // sample is biased because one neighbour lies on the zero-curvature tangent.
+        // We prefer to exclude it, but if that leaves fewer than 2 points we fall
+        // back to the unfiltered set — a mildly biased fit is better than a
+        // single-endpoint fallback that guarantees a wrong answer.
+        var biasCutoff = plateauKappa * 0.01;
+
         var xs = new List<double>(); var ys = new List<double>();
+        var xsAll = new List<double>(); var ysAll = new List<double>();
         for (var i = from; i <= to; i++)
         {
             var kSigned = kappa[i] * sign;
-            if (kSigned > 0) { xs.Add(stations[i]); ys.Add(kSigned); }
+            if (kSigned <= 0 || kSigned >= plateauKappa * 0.95) continue;
+            xsAll.Add(stations[i]); ysAll.Add(kSigned);
+
+            var biased = (fromStart && i > 0 && kappa[i - 1] * sign < biasCutoff)
+                      || (!fromStart && i < kappa.Length - 1 && kappa[i + 1] * sign < biasCutoff);
+            if (!biased) { xs.Add(stations[i]); ys.Add(kSigned); }
         }
-        if (xs.Count < 2) return fromStart ? stations[from] : stations[to];
-        var (ok, slope, intercept) = FitLine(xs, ys);
+
+        // Prefer bias-filtered fit; fall back to unfiltered when too few points survive.
+        var (fitXs, fitYs) = xs.Count >= 2 ? (xs, ys) : (xsAll, ysAll);
+        if (fitXs.Count < 2) return fromStart ? stations[from] : stations[to];
+        var (ok, slope, intercept) = FitLine(fitXs, fitYs);
         if (!ok || Math.Abs(slope) < 1e-15) return fromStart ? stations[from] : stations[to];
         var station = -intercept / slope;   // κ = 0 → station = -b/m
         return Math.Clamp(station,
@@ -363,19 +382,34 @@ internal static class Case2Solver
 
     /// <summary>
     /// Fit a line through the ramp and solve for the station where κ = targetKappa.
+    /// plateauKappa: plateau curvature (1/R); points at or above 95% of plateau
+    /// are excluded for the same reason as in InterpolateRampZero.
     /// </summary>
     private static double InterpolateRampLevel(
         double[] kappa, double[] stations,
         int from, int to, int sign, double targetKappa, bool fromStart)
     {
+        // Same bias-filter logic as InterpolateRampZero: prefer excluding biased
+        // boundary samples, but fall back to the unfiltered set when fewer than
+        // 2 clean points survive (coarse-interval data).
+        var biasCutoff = targetKappa * 0.01;
+
         var xs = new List<double>(); var ys = new List<double>();
+        var xsAll = new List<double>(); var ysAll = new List<double>();
         for (var i = from; i <= to; i++)
         {
             var kSigned = kappa[i] * sign;
-            if (kSigned > 0) { xs.Add(stations[i]); ys.Add(kSigned); }
+            if (kSigned <= 0 || kSigned >= targetKappa * 0.95) continue;
+            xsAll.Add(stations[i]); ysAll.Add(kSigned);
+
+            var biased = (fromStart && i > 0 && kappa[i - 1] * sign < biasCutoff)
+                      || (!fromStart && i < kappa.Length - 1 && kappa[i + 1] * sign < biasCutoff);
+            if (!biased) { xs.Add(stations[i]); ys.Add(kSigned); }
         }
-        if (xs.Count < 2) return fromStart ? stations[to] : stations[from];
-        var (ok, slope, intercept) = FitLine(xs, ys);
+
+        var (fitXs, fitYs) = xs.Count >= 2 ? (xs, ys) : (xsAll, ysAll);
+        if (fitXs.Count < 2) return fromStart ? stations[to] : stations[from];
+        var (ok, slope, intercept) = FitLine(fitXs, fitYs);
         if (!ok || Math.Abs(slope) < 1e-15) return fromStart ? stations[to] : stations[from];
         var station = (targetKappa - intercept) / slope;
         return Math.Clamp(station,

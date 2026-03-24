@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git --version)"
+      "Bash(git --version)",
+      "Bash(dotnet run:*)",
+      "Bash(dotnet build:*)"
     ]
   }
 }
