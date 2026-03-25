@@ -23,12 +23,11 @@ public static class Civil3DProjectStatus
 #if CIVIL3D
 public sealed class AlignmentReforgeCommands
 {
-    // ── CASE1ALIGNMENTDRYRUN ─────────────────────────────────────────────────
+    // ── ALIGNMENTDRYRUN ─────────────────────────────────────────────────
     // Runs the full geometry solver, prints all parameters and validation
     // issues to the command line.  Touches NO Civil 3D geometry objects.
 
     [CommandMethod("ALIGNMENTDRYRUN")]
-    [CommandMethod("CASE1ALIGNMENTDRYRUN")]
     public void DryRun()
     {
         var doc    = Application.DocumentManager.MdiActiveDocument;
@@ -63,20 +62,19 @@ public sealed class AlignmentReforgeCommands
             editor.WriteMessage($"\n[{issue.Severity}] {issue.Message}");
 
         if (solved.Validation.HasErrors)
-            editor.WriteMessage("\n\n⚠  Errors present — run CASE1ALIGNMENTBUILD only after resolving.");
+            editor.WriteMessage("\n\n⚠  Errors present — run ALIGNMENTBUILD only after resolving.");
         else
-            editor.WriteMessage("\n\n✓  All checks passed — safe to run CASE1ALIGNMENTBUILD.");
+            editor.WriteMessage("\n\n✓  All checks passed — safe to run ALIGNMENTBUILD.");
 
         editor.WriteMessage("\n─────────────────────────────────────────\n");
     }
 
-    // ── CASE1ALIGNMENTBUILD ───────────────────────────────────────────────────
+    // ── ALIGNMENTBUILD ───────────────────────────────────────────────────
     // Pre-flight gate: re-runs solver and validates completely.
     // Opens a Civil 3D transaction ONLY if every check passes.
     // Any validation error → hard stop, clear message, no transaction.
 
     [CommandMethod("ALIGNMENTBUILD")]
-    [CommandMethod("CASE1ALIGNMENTBUILD")]
     public void BuildAlignment()
     {
         var doc    = Application.DocumentManager.MdiActiveDocument;
@@ -99,7 +97,7 @@ public sealed class AlignmentReforgeCommands
             editor.WriteMessage("\n⚠  Build aborted — geometry validation failed:");
             foreach (var issue in solved.Validation.Issues.Where(i => i.Severity == ValidationSeverity.Error))
                 editor.WriteMessage($"\n   [ERROR] {issue.Message}");
-            editor.WriteMessage("\nRun CASE1ALIGNMENTDRYRUN for full report. Fix before building.\n");
+            editor.WriteMessage("\nRun ALIGNMENTDRYRUN for full report. Fix before building.\n");
             return;
         }
 
@@ -140,7 +138,7 @@ public sealed class AlignmentReforgeCommands
         {
             var civilDoc  = CivilApplication.ActiveDocument;
             var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-            var alignName = $"ALIGN_{timestamp}";
+            var alignName = $"REFORGE_{timestamp}";
 
             var styleId    = ResolveStyleName(civilDoc.Styles.AlignmentStyles, "Standard", "CASE1 Style");
             var labelSetId = ResolveStyleName(

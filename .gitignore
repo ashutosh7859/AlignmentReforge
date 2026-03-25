@@ -11,6 +11,9 @@ obj/
 # Rider
 .idea/
 
+# Claude Code
+.claude/
+
 # NuGet
 *.nupkg
 packages/

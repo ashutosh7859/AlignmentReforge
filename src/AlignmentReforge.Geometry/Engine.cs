@@ -254,9 +254,11 @@ public sealed class AlignmentReconstructionEngine
     }
 
     /// <summary>
-    /// Average azimuth of up to 4 segments on the tangent side of TS or ST.
-    /// forward=false → average segments arriving at anchor (entry tangent).
-    /// forward=true  → average segments departing from anchor (exit tangent).
+    /// Azimuth of the single segment immediately adjacent to the anchor vertex.
+    /// forward=false → segment arriving at anchor (entry tangent).
+    /// forward=true  → segment departing from anchor (exit tangent).
+    /// Uses circular-mean machinery so it can be extended to multiple segments
+    /// if needed, but only one segment is used to avoid curve-adjacent bias.
     /// </summary>
     private static double AverageTangentBearing(
         IReadOnlyList<Vertex> v, int anchor, bool forward)

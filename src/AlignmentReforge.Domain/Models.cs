@@ -41,7 +41,15 @@ public enum AlignmentInputCase
 
 // ---------- geometry primitives ----------
 
-public sealed record Point2D(double X, double Y);
+public sealed record Point2D(double X, double Y)
+{
+    public double DistanceTo(Point2D other)
+    {
+        var dx = other.X - X;
+        var dy = other.Y - Y;
+        return Math.Sqrt(dx * dx + dy * dy);
+    }
+}
 
 public sealed record Vertex(int Index, Point2D Position, VertexHint Hint)
 {

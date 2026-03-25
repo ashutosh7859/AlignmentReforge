@@ -446,24 +446,18 @@ internal static class Case2Solver
     private static double TangentBearingBefore(
         IReadOnlyList<Vertex> v, double[] st, double tsStation, SolverSettings s)
     {
-        var seg = FindSegment(st, tsStation);
-        for (var i = seg - 1; i >= Math.Max(0, seg - 1); i--)
-        {
-            if (st[i + 1] - st[i] >= s.NearZeroDistance)
-                return Azimuth(v[i].Position, v[i + 1].Position);
-        }
+        var i = Math.Max(0, FindSegment(st, tsStation) - 1);
+        if (i < st.Length - 1 && st[i + 1] - st[i] >= s.NearZeroDistance)
+            return Azimuth(v[i].Position, v[i + 1].Position);
         return Azimuth(v[0].Position, v[Math.Min(1, v.Count - 1)].Position);
     }
 
     private static double TangentBearingAfter(
         IReadOnlyList<Vertex> v, double[] st, double stStation, SolverSettings s)
     {
-        var seg = FindSegment(st, stStation) + 1;
-        for (var i = seg; i <= Math.Min(v.Count - 2, seg); i++)
-        {
-            if (st[i + 1] - st[i] >= s.NearZeroDistance)
-                return Azimuth(v[i].Position, v[i + 1].Position);
-        }
+        var i = Math.Min(v.Count - 2, FindSegment(st, stStation) + 1);
+        if (i >= 0 && i < st.Length - 1 && st[i + 1] - st[i] >= s.NearZeroDistance)
+            return Azimuth(v[i].Position, v[i + 1].Position);
         return Azimuth(v[Math.Max(0, v.Count - 2)].Position, v[^1].Position);
     }
 

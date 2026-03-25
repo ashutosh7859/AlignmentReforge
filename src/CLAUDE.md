@@ -33,6 +33,10 @@ AlignmentReforge/
   - C3: R=700m Ls=100m
   - C4: R=1000m Ls=100m
 
+- **Case 2 solver**: PASSING
+  - Self-check passes at 5m and 20m intervals
+  - All 4 curves recovered from sampled centreline data
+
 - **Validation gates**: PASSING
   - All checks implemented and active
 
@@ -40,15 +44,7 @@ AlignmentReforge/
   - Uses AddFixedLine + AddFreeSCS (not PI-based)
   - Exact reconstruction, not approximate
 
-### What's Broken (PRIORITY)
-- **Case 2 solver**: BROKEN — curve count mismatch
-  - Expected: 4 curves
-  - Actual: 0 curves
-  - Root cause: ComputeCurvatureProfile has wrong implementation
-  - Fix needed: Replace with correct osculating curvature formula (no correction factor)
-
 ### Blocked (Waiting)
-- Case 2 verification
 - Split-alignment logic
 - Civil 3D end-to-end test
 
@@ -147,19 +143,11 @@ python C:\Users\tpi068\.claude-monitor-system\dashboard.py --project AlignmentRe
 ---
 
 ## Next Steps (Priority Order)
-1. **Case 2 solver: fix ComputeCurvatureProfile**
-   - Implement correct osculating curvature formula
-   - No correction factors
-   - Run selfcheck-case2 to verify
-   
-2. **Case 2 solver: verify all 4 curves pass**
-   - Once fix is done, confirm all tests pass
-   
-3. **Split-alignment logic: implement in Civil3DCommands.cs**
+1. **Split-alignment logic: implement in Civil3DCommands.cs**
    - Group consecutive SOLVED zones into blocks
    - Build one alignment per block
-   
-4. **Civil 3D test: load DLL and end-to-end verify**
+
+2. **Civil 3D test: load DLL and end-to-end verify**
    - Load into Civil 3D 2026
    - Test on actual polyline
    - Verify parameters match original design

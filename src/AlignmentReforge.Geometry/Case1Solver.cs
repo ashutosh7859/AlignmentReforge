@@ -234,11 +234,12 @@ internal static class Case1Solver
             return new SpiralResidual(v.Index, sAlong, measured, expected, measured - expected);
         }).ToArray();
     }
+
     private static double ChainLength(IReadOnlyList<Vertex> vertices)
-{
-    var total = 0.0;
-    for (var i = 1; i < vertices.Count; i++)
-        total += Distance(vertices[i - 1].Position, vertices[i].Position);
-    return total;
-}
+    {
+        var total = 0.0;
+        for (var i = 1; i < vertices.Count; i++)
+            total += Distance(vertices[i - 1].Position, vertices[i].Position);
+        return total;
+    }
 }

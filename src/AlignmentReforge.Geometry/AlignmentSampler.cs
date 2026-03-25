@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using AlignmentReforge.Domain;
+using static AlignmentReforge.Geometry.GeometryMath;
 
 namespace AlignmentReforge.Geometry;
 
@@ -155,7 +156,7 @@ public static class AlignmentSampler
     private static Point2D IntegrateEntrySpiral(SolvedCurve curve, double distance)
     {
         var sign = (int)curve.Direction;
-        var bearing = DegreesToRadians(curve.EntryBearing);
+        var bearing = Deg2Rad(curve.EntryBearing);
         var length = Math.Clamp(distance, 0.0, curve.SpiralLengthIn);
         return Integrate(
             curve.TS.Position,
@@ -168,7 +169,7 @@ public static class AlignmentSampler
     private static Point2D IntegrateArc(SolvedCurve curve, double distance)
     {
         var sign = (int)curve.Direction;
-        var startBearing = DegreesToRadians(curve.EntryBearing) + (sign * curve.SpiralLengthIn / (2.0 * curve.Radius));
+        var startBearing = Deg2Rad(curve.EntryBearing) + (sign * curve.SpiralLengthIn / (2.0 * curve.Radius));
         var length = Math.Clamp(distance, 0.0, curve.ArcLength);
         return Integrate(
             curve.SC.Position,
@@ -182,7 +183,7 @@ public static class AlignmentSampler
     {
         var sign = (int)curve.Direction;
         var startBearing =
-            DegreesToRadians(curve.EntryBearing) +
+            Deg2Rad(curve.EntryBearing) +
             (sign * curve.SpiralLengthIn / (2.0 * curve.Radius)) +
             (sign * curve.ArcLength / curve.Radius);
         var length = Math.Clamp(distance, 0.0, curve.SpiralLengthOut);
@@ -221,10 +222,4 @@ public static class AlignmentSampler
 
         return new Point2D(x, y);
     }
-
-    private static double Distance(Point2D a, Point2D b)
-        => Math.Sqrt(((b.X - a.X) * (b.X - a.X)) + ((b.Y - a.Y) * (b.Y - a.Y)));
-
-    private static double DegreesToRadians(double degrees)
-        => degrees * Math.PI / 180.0;
 }
